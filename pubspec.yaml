@@ -1,0 +1,29 @@
+name: moto_guzzi_club
+description: Moto Guzzi Club Pisa - Aquile Alfee
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  cloud_firestore: ^5.6.12
+  provider: ^6.1.5+1
+  url_launcher: ^6.3.1
+  overlay_support: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/logo.png

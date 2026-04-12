@@ -1,0 +1,39 @@
+# Flutter
+.dart_tool/
+.pub/
+*.lock
+*.pid
+*.tmp
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+*.iml
+.DS_Store
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# VSCode
+.vscode/
+
+# Android
+android/app/google-services.json
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+
+# iOS
+ios/Pods/
+ios/Podfile.lock
+ios/Flutter/Generated.xcconfig
+ios/Runner/GoogleService-Info.plist
+
+# macOS
+macos/Pods/
+macos/Podfile.lock
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+
+# Web
+web/favicon.png
