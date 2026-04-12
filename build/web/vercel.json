@@ -5,16 +5,6 @@
   "outputDirectory": "build/web",
   "routes": [
     {
-      "src": "/flutter_service_worker.js",
-      "dest": "/flutter_service_worker.js",
-      "headers": { "Cache-Control": "no-cache" }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1",
-      "continue": true
-    },
-    {
       "handle": "filesystem"
     },
     {
