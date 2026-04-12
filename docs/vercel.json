@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/flutter_service_worker.js",
+      "dest": "/flutter_service_worker.js",
+      "headers": { "Content-Type": "application/javascript" }
+    },
+    {
+      "src": "/main.dart.js",
+      "dest": "/main.dart.js",
+      "headers": { "Content-Type": "application/javascript" }
+    },
+    {
+      "src": "/flutter.js",
+      "dest": "/flutter.js",
+      "headers": { "Content-Type": "application/javascript" }
+    },
+    {
+      "src": "/version.json",
+      "dest": "/version.json",
+      "headers": { "Content-Type": "application/json" }
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json",
+      "headers": { "Content-Type": "application/json" }
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/canvaskit/(.*)",
+      "dest": "/canvaskit/$1"
+    },
+    {
+      "src": "/icons/(.*)",
+      "dest": "/icons/$1"
+    },
+    {
+      "src": "/favicon.png",
+      "dest": "/favicon.png"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
