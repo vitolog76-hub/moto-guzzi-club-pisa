@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/auth_service.dart';
 import '../services/event_chat_service.dart';
 import '../services/event_service.dart';
@@ -17,7 +14,6 @@ import 'create_event_screen.dart';
 import 'event_detail_screen.dart';
 import 'members_list_screen.dart';
 import 'partner_activities_screen.dart';
-import 'send_notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,65 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadRemindedEvents();
     _listenToNewEvents();
-  }
-
-  Future<void> _showFcmTokenDialog() async {
-    String token = '';
-    String? errorMessage;
-
-    try {
-      final vapidKey = kIsWeb
-          ? 'BOLYRSwKpj7Mo9FcfA4aF8tQWQbV_ObogKStUb2XatumAlKIZT2aO-R6m6h2nGMdz1nHjlicTeO1_LHpQvAlNTM'
-          : null;
-      final t = await FirebaseMessaging.instance.getToken(vapidKey: vapidKey);
-      token = t ?? '';
-      if (token.isEmpty) {
-        errorMessage = 'Token non disponibile. Verifica permessi notifiche.';
-      }
-    } catch (e) {
-      errorMessage = 'Errore nel recupero token: $e';
-    }
-
-    if (!mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Token FCM dispositivo'),
-        content: SizedBox(
-          width: 500,
-          child: errorMessage != null
-              ? Text(errorMessage)
-              : SelectableText(token, style: const TextStyle(fontSize: 12)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CHIUDI'),
-          ),
-          if (errorMessage == null)
-            ElevatedButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: token));
-                if (!mounted) return;
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Token copiato negli appunti'),
-                    backgroundColor: guzziRed,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.copy, size: 16),
-              label: const Text('COPIA'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: guzziRed,
-                foregroundColor: Colors.white,
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   void _listenToNewEvents() {
@@ -538,29 +475,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               if (ruolo == 'admin') ...[
-                const SizedBox(height: 8),
-                _buildQuickAccessButton(
-                  icon: Icons.notifications_active_rounded,
-                  title: 'Invia Notifica',
-                  subtitle: 'Prepara e copia testo per Firebase',
-                  colors: const [Color(0xFF1F3B8A), Color(0xFF325BC1)],
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (context) => const SendNotificationScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildQuickAccessButton(
-                  icon: Icons.vpn_key_outlined,
-                  title: 'Mostra token FCM',
-                  subtitle: 'Visualizza e copia token dispositivo',
-                  colors: const [Color(0xFF6A1B9A), Color(0xFF8E24AA)],
-                  onTap: _showFcmTokenDialog,
-                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
