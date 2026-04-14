@@ -5,9 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/event.dart';
 import '../models/participation.dart';
 import '../services/event_service.dart';
+import '../services/image_storage_service.dart';
 import '../services/participation_service.dart';
 import 'home_screen.dart';
 import 'edit_event_screen.dart';
+import 'chat_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final ClubEvent event;
@@ -21,13 +23,12 @@ class EventDetailScreen extends StatefulWidget {
 class _EventDetailScreenState extends State<EventDetailScreen> {
   final ParticipationService _participationService = ParticipationService();
   final EventService _eventService = EventService();
+  final ImageStorageService _imageService = ImageStorageService();
   String _currentUserStatus = 'indeciso';
   String? _currentUserId;
   String _currentUserRuolo = 'user';
-  
+
   static const Color guzziRed = Color(0xFF8B0000);
-  static const Color guzziGold = Color(0xFFD4AF37);
-  static const Color guzziDark = Color(0xFF1A1A1A);
 
   @override
   void initState() {
@@ -41,7 +42,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _loadCurrentUserRuolo() async {
     if (_currentUserId == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(_currentUserId).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_currentUserId)
+        .get();
     if (doc.exists) {
       setState(() {
         _currentUserRuolo = doc.data()?['ruolo'] ?? 'user';
@@ -61,17 +65,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _updateStatus(String nuovoStato) async {
     if (_currentUserId == null) return;
-    
+
     await _participationService.setParticipation(
       _currentUserId!,
       widget.event.id,
       nuovoStato,
     );
-    
+
     setState(() {
       _currentUserStatus = nuovoStato;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Hai risposto: $nuovoStato'),
@@ -85,7 +89,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Elimina evento'),
-        content: Text('Sei sicuro di voler eliminare "${widget.event.titolo}"?'),
+        content: Text(
+          'Sei sicuro di voler eliminare "${widget.event.titolo}"?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -99,8 +105,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ],
       ),
     );
-    
+
     if (confirm == true) {
+      await _imageService.deleteAllEventImages(widget.event.id);
       await _eventService.deleteEvent(widget.event.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -124,20 +131,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         builder: (context) => EditEventScreen(event: widget.event),
       ),
     );
-    
+
     if (result == true && mounted) {
-      // Ricarica la pagina per mostrare i dati aggiornati
       setState(() {});
     }
   }
 
-  void _openGoogleMaps() async {
-    final indirizzo = widget.event.luogo;
-    if (indirizzo.isEmpty) return;
-    
-    final encodedAddress = Uri.encodeComponent(indirizzo);
-    final url = 'https://www.google.com/maps/search/?api=1&query=$encodedAddress';
-    
+  void _openGoogleMaps(String address) async {
+    if (address.isEmpty) return;
+
+    final encodedAddress = Uri.encodeComponent(address);
+    final url =
+        'https://www.google.com/maps/search/?api=1&query=$encodedAddress';
+
     final Uri uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -181,7 +187,53 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dettagli evento
+            if (widget.event.hasImages) ...[
+              ...widget.event.imageUrls.asMap().entries.map((entry) {
+                final index = entry.key;
+                final url = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: index < widget.event.imageUrls.length - 1 ? 12 : 0),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: GestureDetector(
+                          onTap: () => _showFullScreenImage(context, index),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 40),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: guzziRed,
+                                    value: progress.expectedTotalBytes != null
+                                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 120,
+                              color: Colors.grey.shade200,
+                              child: const Center(
+                                child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+            ],
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -211,7 +263,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: guzziRed.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
@@ -230,67 +285,65 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     const Divider(height: 24),
                     _infoRow('Data', widget.event.formattedDateTime),
                     const SizedBox(height: 12),
-                    
-                    // Luogo con Google Maps cliccabile
-                    GestureDetector(
-                      onTap: _openGoogleMaps,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(width: 80),
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.event.luogo,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: guzziRed.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.map, size: 14, color: guzziRed),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'MAPPA',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: guzziRed,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    _infoRow(
+                      'Luogo',
+                      widget.event.luogo,
+                      isClickable: true,
+                      onTap: () => _openGoogleMaps(widget.event.luogo),
                     ),
-                    
+                    if (widget.event.hasPuntoRitrovo) ...[
+                      const SizedBox(height: 12),
+                      _infoRow(
+                        'Punto di ritrovo',
+                        widget.event.puntoRitrovo!,
+                        isClickable: true,
+                        onTap: () =>
+                            _openGoogleMaps(widget.event.puntoRitrovo!),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _infoRow('Descrizione', widget.event.descrizione),
                   ],
                 ),
               ),
             ),
-            
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _currentUserId == null
+                    ? null
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            eventId: widget.event.id,
+                            eventTitle: widget.event.titolo,
+                          ),
+                        ),
+                      ),
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text(
+                  'CHAT',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: guzziRed,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade400,
+                  disabledForegroundColor: Colors.white70,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 20),
-            
-            // Sezione partecipazione
+
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -322,17 +375,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       children: [
                         _buildStatusButton('si', 'CONFERMO', Colors.green),
                         _buildStatusButton('no', 'NON POSSO', Colors.red),
-                        _buildStatusButton('indeciso', 'INDECISO', Colors.orange),
+                        _buildStatusButton(
+                          'indeciso',
+                          'INDECISO',
+                          Colors.orange,
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
-            // Lista partecipanti
+
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -360,28 +416,37 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                     const SizedBox(height: 16),
                     StreamBuilder<List<Participation>>(
-                      stream: _participationService.streamParticipationsForEvent(widget.event.id),
+                      stream: _participationService
+                          .streamParticipationsForEvent(widget.event.id),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
-                        
+
                         if (snapshot.hasError) {
-                          return Center(child: Text('Errore: ${snapshot.error}'));
+                          return Center(
+                            child: Text('Errore: ${snapshot.error}'),
+                          );
                         }
-                        
+
                         final partecipazioni = snapshot.data ?? [];
-                        
+
                         final partecipantiSi = <String>[];
                         final partecipantiNo = <String>[];
                         final partecipantiIndeciso = <String>[];
-                        
+
                         for (var p in partecipazioni) {
-                          if (p.stato == 'si') partecipantiSi.add(p.userId);
-                          else if (p.stato == 'no') partecipantiNo.add(p.userId);
-                          else if (p.stato == 'indeciso') partecipantiIndeciso.add(p.userId);
+                          if (p.stato == 'si') {
+                            partecipantiSi.add(p.userId);
+                          } else if (p.stato == 'no')
+                            partecipantiNo.add(p.userId);
+                          else if (p.stato == 'indeciso')
+                            partecipantiIndeciso.add(p.userId);
                         }
-                        
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -391,7 +456,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.green.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green.shade200),
+                                  border: Border.all(
+                                    color: Colors.green.shade200,
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,15 +471,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    ...partecipantiSi.map((userId) => FutureBuilder(
-                                      future: _getUserName(userId),
-                                      builder: (context, snapshot) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 4, left: 8),
-                                          child: Text(snapshot.data ?? 'Caricamento...'),
-                                        );
-                                      },
-                                    )),
+                                    ...partecipantiSi.map(
+                                      (userId) => FutureBuilder(
+                                        future: _getUserName(userId),
+                                        builder: (context, snapshot) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 4,
+                                              left: 8,
+                                            ),
+                                            child: Text(
+                                              snapshot.data ?? 'Caricamento...',
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -424,7 +498,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.shade200),
+                                  border: Border.all(
+                                    color: Colors.red.shade200,
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,15 +513,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    ...partecipantiNo.map((userId) => FutureBuilder(
-                                      future: _getUserName(userId),
-                                      builder: (context, snapshot) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 4, left: 8),
-                                          child: Text(snapshot.data ?? 'Caricamento...'),
-                                        );
-                                      },
-                                    )),
+                                    ...partecipantiNo.map(
+                                      (userId) => FutureBuilder(
+                                        future: _getUserName(userId),
+                                        builder: (context, snapshot) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 4,
+                                              left: 8,
+                                            ),
+                                            child: Text(
+                                              snapshot.data ?? 'Caricamento...',
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -457,7 +540,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.orange.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.shade200),
+                                  border: Border.all(
+                                    color: Colors.orange.shade200,
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,15 +555,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    ...partecipantiIndeciso.map((userId) => FutureBuilder(
-                                      future: _getUserName(userId),
-                                      builder: (context, snapshot) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 4, left: 8),
-                                          child: Text(snapshot.data ?? 'Caricamento...'),
-                                        );
-                                      },
-                                    )),
+                                    ...partecipantiIndeciso.map(
+                                      (userId) => FutureBuilder(
+                                        future: _getUserName(userId),
+                                        builder: (context, snapshot) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 4,
+                                              left: 8,
+                                            ),
+                                            child: Text(
+                                              snapshot.data ?? 'Caricamento...',
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -508,22 +600,85 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  void _showFullScreenImage(BuildContext context, int initialIndex) {
+    final pageCtrl = PageController(initialPage: initialIndex);
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            PageView.builder(
+              controller: pageCtrl,
+              itemCount: widget.event.imageUrls.length,
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Image.network(
+                      widget.event.imageUrls[index],
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image,
+                        color: Colors.white54,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(
+    String label,
+    String value, {
+    bool isClickable = false,
+    VoidCallback? onTap,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 80,
+          width: 110,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 14),
-          ),
+          child: isClickable && onTap != null
+              ? GestureDetector(
+                  onTap: onTap,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                )
+              : Text(value, style: const TextStyle(fontSize: 14)),
         ),
       ],
     );
@@ -544,7 +699,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
         ),
       ),
     );
@@ -552,7 +710,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<String> _getUserName(String userId) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
       if (doc.exists) {
         final data = doc.data()!;
         final nome = data['nome'] ?? 'Sconosciuto';

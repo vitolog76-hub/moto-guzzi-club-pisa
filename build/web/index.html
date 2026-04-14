@@ -16,6 +16,22 @@
   -->
   <base href="/moto-guzzi-club-pisa/">
 
+  <script>
+    if ('serviceWorker' in navigator) {
+      // Register Firebase messaging SW at the correct subpath BEFORE the SDK loads.
+      // Firebase SDK calls register('/firebase-messaging-sw.js') with an absolute root path,
+      // which fails on GitHub Pages subpath deployments (/moto-guzzi-club-pisa/).
+      // We intercept register() to redirect that call to our already-registered SW.
+      var _fcmSwReg = navigator.serviceWorker.register('firebase-messaging-sw.js');
+      var _origRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+      navigator.serviceWorker.register = function(scriptURL, options) {
+        if (typeof scriptURL === 'string' && scriptURL.includes('firebase-messaging-sw.js')) {
+          return _fcmSwReg;
+        }
+        return _origRegister(scriptURL, options);
+      };
+    }
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">

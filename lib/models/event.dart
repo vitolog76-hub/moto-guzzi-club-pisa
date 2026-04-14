@@ -7,9 +7,11 @@ class ClubEvent {
   final DateTime dataInizio;
   final DateTime? dataFine;
   final String luogo;
+  final String? puntoRitrovo;
   final String descrizione;
   final DateTime dataCreazione;
   final Map<String, List<String>> ruoli;
+  final List<String> imageUrls;
 
   ClubEvent({
     required this.id,
@@ -18,13 +20,25 @@ class ClubEvent {
     required this.dataInizio,
     this.dataFine,
     required this.luogo,
+    this.puntoRitrovo,
     required this.descrizione,
     required this.dataCreazione,
     required this.ruoli,
+    this.imageUrls = const [],
   });
 
   bool get isMultiDay => dataFine != null;
-  
+
+  bool get hasPuntoRitrovo => puntoRitrovo != null && puntoRitrovo!.isNotEmpty;
+
+  bool get hasImages => imageUrls.isNotEmpty;
+
+  String? get thumbnailUrl => imageUrls.isNotEmpty ? imageUrls.first : null;
+
+  DateTime get dataRiferimentoFine => dataFine ?? dataInizio;
+
+  bool get isPastEvent => dataRiferimentoFine.isBefore(DateTime.now());
+
   String get formattedDateRange {
     if (dataFine == null) {
       return _formatDate(dataInizio);
@@ -38,7 +52,7 @@ class ClubEvent {
 
   String get formattedDateTime {
     if (dataFine == null) {
-      return '${_formatDateTime(dataInizio)}';
+      return _formatDateTime(dataInizio);
     }
     return 'Dal ${_formatDateTime(dataInizio)} al ${_formatDateTime(dataFine!)}';
   }
@@ -54,18 +68,18 @@ class ClubEvent {
       'dataInizio': Timestamp.fromDate(dataInizio),
       'dataFine': dataFine != null ? Timestamp.fromDate(dataFine!) : null,
       'luogo': luogo,
+      'puntoRitrovo': puntoRitrovo,
       'descrizione': descrizione,
       'dataCreazione': Timestamp.fromDate(dataCreazione),
       'ruoli': ruoli,
+      'imageUrls': imageUrls,
     };
   }
 
   factory ClubEvent.fromMap(String id, Map<String, dynamic> map) {
-    // Supporto sia per vecchio campo 'data' che per nuovo 'dataInizio'
     DateTime dataInizioDateTime;
     DateTime? dataFineDateTime;
-    
-    // Prova a leggere dataInizio (nuovo formato)
+
     final dataInizioField = map['dataInizio'];
     if (dataInizioField != null) {
       if (dataInizioField is Timestamp) {
@@ -76,7 +90,6 @@ class ClubEvent {
         dataInizioDateTime = DateTime.now();
       }
     } else {
-      // Fallback al vecchio campo 'data'
       final oldDataField = map['data'];
       if (oldDataField is Timestamp) {
         dataInizioDateTime = oldDataField.toDate();
@@ -86,8 +99,7 @@ class ClubEvent {
         dataInizioDateTime = DateTime.now();
       }
     }
-    
-    // Leggi dataFine (solo nuovo formato)
+
     final dataFineField = map['dataFine'];
     if (dataFineField != null) {
       if (dataFineField is Timestamp) {
@@ -96,7 +108,21 @@ class ClubEvent {
         dataFineDateTime = dataFineField;
       }
     }
-    
+
+    // Backward compatible: support both imageUrls (list) and legacy imageUrl (string)
+    List<String> parsedImageUrls;
+    final imageUrlsList = map['imageUrls'];
+    if (imageUrlsList is List) {
+      parsedImageUrls = imageUrlsList.cast<String>();
+    } else {
+      final legacyUrl = map['imageUrl'];
+      if (legacyUrl is String && legacyUrl.isNotEmpty) {
+        parsedImageUrls = [legacyUrl];
+      } else {
+        parsedImageUrls = [];
+      }
+    }
+
     return ClubEvent(
       id: id,
       tipo: map['tipo'] ?? '',
@@ -104,9 +130,11 @@ class ClubEvent {
       dataInizio: dataInizioDateTime,
       dataFine: dataFineDateTime,
       luogo: map['luogo'] ?? '',
+      puntoRitrovo: map['puntoRitrovo'],
       descrizione: map['descrizione'] ?? '',
       dataCreazione: (map['dataCreazione'] as Timestamp).toDate(),
       ruoli: Map<String, List<String>>.from(map['ruoli'] ?? {}),
+      imageUrls: parsedImageUrls,
     );
   }
 }

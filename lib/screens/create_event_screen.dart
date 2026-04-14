@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/event_service.dart';
+import '../services/image_storage_service.dart';
 import '../services/notification_service.dart';
 import '../models/event.dart';
+import '../widgets/image_picker_section.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -16,6 +18,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titoloController = TextEditingController();
   final _luogoController = TextEditingController();
+  final _puntoRitrovoController = TextEditingController();
   final _descrizioneController = TextEditingController();
   
   String _selectedTipo = 'raduno';
@@ -28,6 +31,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   
   final List<String> _tipiEventi = ['raduno', 'riunione', 'cena', 'motogiro'];
   final EventService _eventService = EventService();
+  final ImageStorageService _imageService = ImageStorageService();
+  
+  List<XFile> _pickedImages = [];
+  bool _isSaving = false;
   
   static const Color guzziRed = Color(0xFF8B0000);
 
@@ -70,6 +77,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   void _saveEvent() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isSaving = true);
+
       final DateTime dataInizioCompleta = DateTime(
         _dataInizio.year,
         _dataInizio.month,
@@ -89,27 +98,49 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         );
       }
 
+      final eventId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      List<String> imageUrls = [];
+      if (_pickedImages.isNotEmpty) {
+        try {
+          imageUrls = await _imageService.uploadEventImages(eventId, _pickedImages);
+        } catch (e) {
+          if (mounted) {
+            setState(() => _isSaving = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Errore upload immagini: $e'),
+                backgroundColor: guzziRed,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       final newEvent = ClubEvent(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: eventId,
         tipo: _selectedTipo,
         titolo: _titoloController.text,
         dataInizio: dataInizioCompleta,
         dataFine: dataFineCompleta,
         luogo: _luogoController.text,
+        puntoRitrovo: _puntoRitrovoController.text.trim().isEmpty ? null : _puntoRitrovoController.text.trim(),
         descrizione: _descrizioneController.text,
         dataCreazione: DateTime.now(),
         ruoli: {},
+        imageUrls: imageUrls,
       );
 
       await _eventService.createEvent(newEvent);
       
-      // Notifica per il nuovo evento
       NotificationService.showNewEventNotification(
         newEvent.titolo,
         newEvent.formattedDateRange,
       );
       
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Evento creato con successo!'),
@@ -118,7 +149,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         );
         Navigator.pop(context);
       }
-      
     }
   }
 
@@ -157,7 +187,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               const Text('Tipo evento', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedTipo,
+                initialValue: _selectedTipo,
                 items: _tipiEventi.map((String tipo) {
                   return DropdownMenuItem<String>(
                     value: tipo,
@@ -201,7 +231,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         _isMultiDay = value;
                       });
                     },
-                    activeColor: guzziRed,
+                    activeThumbColor: guzziRed,
                   ),
                 ],
               ),
@@ -286,7 +316,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               TextFormField(
                 controller: _luogoController,
                 decoration: InputDecoration(
-                  labelText: 'Luogo / Indirizzo',
+                  labelText: 'Luogo',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.map, color: guzziRed),
@@ -312,13 +342,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Clicca sulla mappa per verificare l\'indirizzo su Google Maps',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _puntoRitrovoController,
+                decoration: const InputDecoration(
+                  labelText: 'Punto di ritrovo (opzionale)',
+                  hintText: 'Es: Parcheggio dello stadio, ore 09:00',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 16),
-              
               TextFormField(
                 controller: _descrizioneController,
                 decoration: const InputDecoration(
@@ -328,11 +361,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 maxLines: 4,
               ),
               const SizedBox(height: 24),
+              ImagePickerSection(
+                existingImageUrls: const [],
+                newImages: _pickedImages,
+                onNewImagesPicked: (files) {
+                  setState(() {
+                    _pickedImages = [..._pickedImages, ...files];
+                  });
+                },
+                onExistingImageRemoved: (_) {},
+                onNewImageRemoved: (index) {
+                  setState(() {
+                    _pickedImages = List.from(_pickedImages)..removeAt(index);
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _saveEvent,
+                  onPressed: _isSaving ? null : _saveEvent,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: guzziRed,
                     foregroundColor: Colors.white,
@@ -340,7 +389,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('CREA EVENTO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text('CREA EVENTO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],

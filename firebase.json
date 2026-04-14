@@ -1,1 +1,47 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"motoguzziclub-97318","appId":"1:730640135992:android:c2f0949ac6d9811f8533cd","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"motoguzziclub-97318","appId":"1:730640135992:ios:5f74271c72a116b88533cd","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"motoguzziclub-97318","appId":"1:730640135992:ios:5f74271c72a116b88533cd","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"motoguzziclub-97318","configurations":{"android":"1:730640135992:android:c2f0949ac6d9811f8533cd","ios":"1:730640135992:ios:5f74271c72a116b88533cd","macos":"1:730640135992:ios:5f74271c72a116b88533cd","web":"1:730640135992:web:eb7d889ee33f5bf18533cd","windows":"1:730640135992:web:5ea2e5e208c0ec278533cd"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "motoguzziclub-97318",
+          "appId": "1:730640135992:android:c2f0949ac6d9811f8533cd",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "motoguzziclub-97318",
+          "appId": "1:730640135992:ios:5f74271c72a116b88533cd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "motoguzziclub-97318",
+          "appId": "1:730640135992:ios:5f74271c72a116b88533cd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "motoguzziclub-97318",
+          "configurations": {
+            "android": "1:730640135992:android:c2f0949ac6d9811f8533cd",
+            "ios": "1:730640135992:ios:5f74271c72a116b88533cd",
+            "macos": "1:730640135992:ios:5f74271c72a116b88533cd",
+            "web": "1:730640135992:web:eb7d889ee33f5bf18533cd",
+            "windows": "1:730640135992:web:5ea2e5e208c0ec278533cd"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default"
+    }
+  ]
+}

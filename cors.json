@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["http://localhost:*", "https://vitolog76-hub.github.io"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]

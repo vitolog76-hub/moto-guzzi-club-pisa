@@ -1,10 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'push_notification_service.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final PushNotificationService _pushNotificationService =
+      PushNotificationService();
   User? _user;
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
@@ -18,8 +22,14 @@ class AuthService extends ChangeNotifier {
       _user = user;
       if (user != null) {
         await _loadUserData(user.uid);
+        unawaited(
+          _pushNotificationService
+              .initializeForUser(user.uid)
+              .catchError((_) {}),
+        );
       } else {
         _userData = null;
+        await _pushNotificationService.dispose();
       }
       _isLoading = false;
       notifyListeners();
@@ -28,7 +38,10 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _loadUserData(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
       if (doc.exists) {
         _userData = doc.data() as Map<String, dynamic>;
       }
@@ -37,16 +50,21 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String email, String password, String nome, String modelloMoto) async {
+  Future<bool> register(
+    String email,
+    String password,
+    String nome,
+    String modelloMoto,
+  ) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       await result.user?.updateDisplayName(nome);
       await result.user?.reload();
-      
+
       await _firestore.collection('users').doc(result.user!.uid).set({
         'nome': nome,
         'email': email,
@@ -54,7 +72,7 @@ class AuthService extends ChangeNotifier {
         'ruolo': 'user',
         'dataRegistrazione': FieldValue.serverTimestamp(),
       });
-      
+
       await _loadUserData(result.user!.uid);
       return true;
     } on FirebaseAuthException catch (e) {
@@ -65,10 +83,7 @@ class AuthService extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
       return true;
     } on FirebaseAuthException catch (e) {
       print('Errore login: ${e.message}');
@@ -99,7 +114,7 @@ class AuthService extends ChangeNotifier {
   String getEmail() {
     return _user?.email ?? _userData?['email'] ?? '';
   }
-  
+
   bool isLoggedIn() {
     return _user != null;
   }

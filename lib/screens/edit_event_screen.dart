@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/event.dart';
 import '../services/event_service.dart';
+import '../services/image_storage_service.dart';
+import '../widgets/image_picker_section.dart';
 
 class EditEventScreen extends StatefulWidget {
   final ClubEvent event;
@@ -16,6 +18,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titoloController;
   late TextEditingController _luogoController;
+  late TextEditingController _puntoRitrovoController;
   late TextEditingController _descrizioneController;
   
   late String _selectedTipo;
@@ -27,6 +30,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
   
   final List<String> _tipiEventi = ['raduno', 'riunione', 'cena', 'motogiro'];
   final EventService _eventService = EventService();
+  final ImageStorageService _imageService = ImageStorageService();
+
+  late List<String> _existingImageUrls;
+  List<XFile> _newImages = [];
+  final List<String> _removedImageUrls = [];
+  bool _isSaving = false;
   
   static const Color guzziRed = Color(0xFF8B0000);
 
@@ -36,6 +45,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     
     _titoloController = TextEditingController(text: widget.event.titolo);
     _luogoController = TextEditingController(text: widget.event.luogo);
+    _puntoRitrovoController = TextEditingController(text: widget.event.puntoRitrovo ?? '');
     _descrizioneController = TextEditingController(text: widget.event.descrizione);
     
     _selectedTipo = widget.event.tipo;
@@ -46,6 +56,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _oraFine = widget.event.dataFine != null 
         ? TimeOfDay.fromDateTime(widget.event.dataFine!) 
         : TimeOfDay.fromDateTime(widget.event.dataInizio);
+    _existingImageUrls = List.from(widget.event.imageUrls);
   }
 
   Future<void> _selectDate(BuildContext context, bool isInizio) async {
@@ -87,6 +98,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   Future<void> _updateEvent() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isSaving = true);
+
       final DateTime dataInizioCompleta = DateTime(
         _dataInizio.year,
         _dataInizio.month,
@@ -106,6 +119,35 @@ class _EditEventScreenState extends State<EditEventScreen> {
         );
       }
 
+      // Delete removed images from storage
+      if (_removedImageUrls.isNotEmpty) {
+        await _imageService.deleteImages(_removedImageUrls);
+      }
+
+      // Upload new images
+      List<String> newUploadedUrls = [];
+      if (_newImages.isNotEmpty) {
+        try {
+          newUploadedUrls = await _imageService.uploadEventImages(
+            widget.event.id,
+            _newImages,
+          );
+        } catch (e) {
+          if (mounted) {
+            setState(() => _isSaving = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Errore upload immagini: $e'),
+                backgroundColor: guzziRed,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      final allImageUrls = [..._existingImageUrls, ...newUploadedUrls];
+
       final updatedEvent = ClubEvent(
         id: widget.event.id,
         tipo: _selectedTipo,
@@ -113,14 +155,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
         dataInizio: dataInizioCompleta,
         dataFine: dataFineCompleta,
         luogo: _luogoController.text,
+        puntoRitrovo: _puntoRitrovoController.text.trim().isEmpty ? null : _puntoRitrovoController.text.trim(),
         descrizione: _descrizioneController.text,
         dataCreazione: widget.event.dataCreazione,
         ruoli: widget.event.ruoli,
+        imageUrls: allImageUrls,
       );
 
       await _eventService.updateEvent(updatedEvent);
       
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Evento aggiornato con successo!'),
@@ -150,7 +195,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
               const Text('Tipo evento', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedTipo,
+                initialValue: _selectedTipo,
                 items: _tipiEventi.map((String tipo) {
                   return DropdownMenuItem<String>(
                     value: tipo,
@@ -194,7 +239,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         _isMultiDay = value;
                       });
                     },
-                    activeColor: guzziRed,
+                    activeThumbColor: guzziRed,
                   ),
                 ],
               ),
@@ -279,7 +324,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
               TextFormField(
                 controller: _luogoController,
                 decoration: const InputDecoration(
-                  labelText: 'Luogo / Indirizzo',
+                  labelText: 'Luogo',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
@@ -291,6 +336,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
+                controller: _puntoRitrovoController,
+                decoration: const InputDecoration(
+                  labelText: 'Punto di ritrovo (opzionale)',
+                  hintText: 'Es: Parcheggio dello stadio, ore 09:00',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
                 controller: _descrizioneController,
                 decoration: const InputDecoration(
                   labelText: 'Descrizione',
@@ -299,11 +353,32 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 maxLines: 4,
               ),
               const SizedBox(height: 24),
+              ImagePickerSection(
+                existingImageUrls: _existingImageUrls,
+                newImages: _newImages,
+                onNewImagesPicked: (files) {
+                  setState(() {
+                    _newImages = [..._newImages, ...files];
+                  });
+                },
+                onExistingImageRemoved: (index) {
+                  setState(() {
+                    _removedImageUrls.add(_existingImageUrls[index]);
+                    _existingImageUrls = List.from(_existingImageUrls)..removeAt(index);
+                  });
+                },
+                onNewImageRemoved: (index) {
+                  setState(() {
+                    _newImages = List.from(_newImages)..removeAt(index);
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _updateEvent,
+                  onPressed: _isSaving ? null : _updateEvent,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: guzziRed,
                     foregroundColor: Colors.white,
@@ -311,7 +386,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('AGGIORNA EVENTO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text('AGGIORNA EVENTO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
