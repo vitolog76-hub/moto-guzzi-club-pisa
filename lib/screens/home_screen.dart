@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -98,8 +99,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final daysUntilEvent = event.dataInizio.difference(now).inDays;
 
+      debugPrint('[REMINDER] "${event.titolo}" dataInizio=${event.dataInizio} now=$now days=$daysUntilEvent');
+
       // Only show reminder if the event is within the next 3 days
       if (daysUntilEvent <= 3) {
+        debugPrint('[REMINDER] SHOWING notification for "${event.titolo}" (days=$daysUntilEvent)');
         NotificationService.showEventReminderNotification(
           event.titolo,
           event.formattedDateRange,
