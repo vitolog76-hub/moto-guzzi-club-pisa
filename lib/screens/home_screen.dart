@@ -1,14 +1,10 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/event_chat_service.dart';
 import '../services/event_service.dart';
-import '../services/notification_service.dart';
 import '../services/participation_service.dart';
 import '../models/event.dart';
 import 'create_event_screen.dart';
@@ -27,11 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final EventService _eventService = EventService();
   final ParticipationService _participationService = ParticipationService();
   final EventChatService _chatService = EventChatService();
-  late StreamSubscription<List<ClubEvent>> _eventsSubscription;
-  List<ClubEvent> _previousEvents = [];
-  final Map<String, Timer> _eventReminderTimers = {};
-  final Set<String> _remindedEventIds = {};
-  bool _reminderCacheLoaded = false;
 
   static const Color guzziRed = Color(0xFF8B0000);
   static const Color guzziGold = Color(0xFFD4AF37);
@@ -39,102 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color guzziLight = Color(0xFFF8F9FA);
 
   @override
-  void initState() {
-    super.initState();
-    _loadRemindedEvents();
-    _listenToNewEvents();
-  }
-
-  void _listenToNewEvents() {
-    _eventsSubscription = _eventService.streamAllEvents().listen((events) {
-      if (_previousEvents.isNotEmpty &&
-          events.length > _previousEvents.length) {
-        final newEvent = events.firstWhere(
-          (event) => !_previousEvents.any((e) => e.id == event.id),
-          orElse: () => events.first,
-        );
-
-        if (newEvent.id != _previousEvents.first.id) {
-          NotificationService.showNewEventNotification(
-            newEvent.titolo,
-            newEvent.formattedDateRange,
-          );
-        }
-      }
-      _previousEvents = events;
-      _scheduleEventReminders(events);
-    });
-  }
-
-  Future<void> _loadRemindedEvents() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getStringList('event_reminded_ids') ?? [];
-    _remindedEventIds
-      ..clear()
-      ..addAll(saved);
-    _reminderCacheLoaded = true;
-  }
-
-  Future<void> _markEventAsReminded(String eventId) async {
-    _remindedEventIds.add(eventId);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('event_reminded_ids', _remindedEventIds.toList());
-  }
-
-  void _scheduleEventReminders(List<ClubEvent> events) {
-    if (!_reminderCacheLoaded) return;
-    final now = DateTime.now();
-    final activeIds = events.map((e) => e.id).toSet();
-
-    for (final staleId
-        in _eventReminderTimers.keys
-            .where((id) => !activeIds.contains(id))
-            .toList()) {
-      _eventReminderTimers.remove(staleId)?.cancel();
-    }
-
-    for (final event in events) {
-      if (_remindedEventIds.contains(event.id)) continue;
-      if (event.dataInizio.isBefore(now)) continue;
-
-      final daysUntilEvent = event.dataInizio.difference(now).inDays;
-
-      debugPrint('[REMINDER] "${event.titolo}" dataInizio=${event.dataInizio} now=$now days=$daysUntilEvent');
-
-      // Only show reminder if the event is within the next 3 days
-      if (daysUntilEvent <= 3) {
-        debugPrint('[REMINDER] SHOWING notification for "${event.titolo}" (days=$daysUntilEvent)');
-        NotificationService.showEventReminderNotification(
-          event.titolo,
-          event.formattedDateRange,
-        );
-        _markEventAsReminded(event.id);
-        continue;
-      }
-
-      // Schedule a timer for events further away
-      final reminderAt = event.dataInizio.subtract(const Duration(days: 3));
-      if (_eventReminderTimers.containsKey(event.id)) continue;
-
-      final delay = reminderAt.difference(now);
-      _eventReminderTimers[event.id] = Timer(delay, () {
-        NotificationService.showEventReminderNotification(
-          event.titolo,
-          event.formattedDateRange,
-        );
-        _markEventAsReminded(event.id);
-        _eventReminderTimers.remove(event.id);
-      });
-    }
-  }
-
-  @override
   void dispose() {
-    _eventsSubscription.cancel();
-    for (final timer in _eventReminderTimers.values) {
-      timer.cancel();
-    }
-    _eventReminderTimers.clear();
     super.dispose();
   }
 
