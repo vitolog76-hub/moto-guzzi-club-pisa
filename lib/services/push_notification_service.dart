@@ -59,12 +59,6 @@ class PushNotificationService {
     if (normalized.isEmpty || normalized.startsWith('REPLACE_WITH')) {
       return null;
     }
-
-    final vapidPattern = RegExp(r'^[A-Za-z0-9_-]{80,}$');
-    if (!vapidPattern.hasMatch(normalized)) {
-      debugPrint('FCM VAPID key seems invalid format.');
-      return null;
-    }
     return normalized;
   }
 
