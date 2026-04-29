@@ -48,6 +48,22 @@
 
   <title>moto_guzzi_club</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* FORZA ORIENTAMENTO ORIZZONTALE PER MOBILE */
+    @media (orientation: portrait) {
+      body {
+        transform: rotate(90deg);
+        transform-origin: center center;
+        width: 100vh;
+        height: 100vw;
+        overflow-x: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+      }
+    }
+  </style>
 </head>
 <body>
   <!--
