@@ -36,3 +36,5 @@ macos/Flutter/ephemeral/
 
 # Web
 web/favicon.png
+# Build outputs
+build/
