@@ -187,7 +187,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               const Text('Tipo evento', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _selectedTipo,
+                value: _selectedTipo,
                 items: _tipiEventi.map((String tipo) {
                   return DropdownMenuItem<String>(
                     value: tipo,
@@ -231,7 +231,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         _isMultiDay = value;
                       });
                     },
-                    activeThumbColor: guzziRed,
+                    activeColor: guzziRed,
                   ),
                 ],
               ),
