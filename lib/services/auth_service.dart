@@ -91,6 +91,26 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Metodo per inviare l'email di reset password
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'Nessun utente trovato con questa email.';
+          break;
+        case 'invalid-email':
+          message = 'Indirizzo email non valido.';
+          break;
+        default:
+          message = 'Errore durante l\'invio dell\'email di reset.';
+      }
+      throw Exception(message);
+    }
+  }
+
   Future<void> logout() async {
     await _auth.signOut();
   }
