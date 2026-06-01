@@ -41,9 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final isLandscape = mediaQuery.orientation == Orientation.landscape;
     final horizontalPadding = isLandscape ? 12.0 : 16.0;
     final logoSize = isLandscape ? 80.0 : 95.0;
-    final titleFontSize = isLandscape ? 18.0 : 22.0;
-    final subtitleFontSize = isLandscape ? 14.0 : 18.0;
-    final toolbarHeight = isLandscape ? 84.0 : 96.0;
+    final titleFontSize = isLandscape
+        ? 20.0
+        : (mediaQuery.size.width < 360 ? 16.0 : 18.0);
+    final subtitleFontSize = isLandscape
+        ? 16.0
+        : (mediaQuery.size.width < 360 ? 12.0 : 14.0);
+    final toolbarHeight = isLandscape ? 84.0 : 90.0;
 
     return Scaffold(
       backgroundColor: guzziLight,
@@ -403,6 +407,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEventCard(ClubEvent event, {bool isArchived = false}) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final eventTitleFontSize = isLandscape ? 16.0 : 14.0;
+    final eventMetaFontSize = isLandscape ? 13.0 : 12.0;
+
     // Colore in base al tipo di evento
     Color cardColor;
     Color badgeColor;
@@ -526,22 +534,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      // Badge always below title to avoid covering it
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              event.titolo.toUpperCase(),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: textColor,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  event.titolo.toUpperCase(),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: eventTitleFontSize,
+                                    color: textColor,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              _buildUnreadChatIndicator(event.id),
+                            ],
                           ),
-                          _buildUnreadChatIndicator(event.id),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 4),
                           _buildConfirmedBadge(event.id),
                         ],
                       ),
@@ -558,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               event.formattedDateRange,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: eventMetaFontSize,
                                 color: Colors.grey.shade600,
                               ),
                             ),
@@ -578,7 +592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               event.luogo,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: eventMetaFontSize,
                                 color: Colors.grey.shade600,
                               ),
                               overflow: TextOverflow.ellipsis,
