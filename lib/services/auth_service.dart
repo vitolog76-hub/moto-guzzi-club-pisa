@@ -111,6 +111,38 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<String> recoverUserEmailByName(String nome) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('nome', isEqualTo: nome)
+          .limit(2)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('Nessun utente trovato con questo nome.');
+      }
+
+      if (querySnapshot.docs.length > 1) {
+        throw Exception(
+          'Sono stati trovati più utenti con questo nome. Contatta l\'amministratore.',
+        );
+      }
+
+      final data = querySnapshot.docs.first.data();
+      final email = data['email'] as String?;
+      if (email == null || email.isEmpty) {
+        throw Exception('Email associata non disponibile.');
+      }
+      return email;
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        throw Exception('Errore durante il recupero dell\'utente.');
+      }
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     await _auth.signOut();
   }

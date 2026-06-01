@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String _errorMessage = '';
-  
+
   static const Color guzziRed = Color(0xFF8B0000);
   static const Color guzziDark = Color(0xFF1A1A1A);
 
@@ -46,20 +46,38 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Dialog per il reset della password
-  void _showPasswordResetDialog(BuildContext context) {
+  // Dialog per recupero credenziali (password e utente)
+  void _showCredentialsRecoveryDialog(BuildContext context) {
     final emailController = TextEditingController();
+    final nomeController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Recupera password'),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            hintText: 'Inserisci la tua email',
-            labelText: 'Email',
-          ),
-          keyboardType: TextInputType.emailAddress,
+        title: const Text('Recupera credenziali'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Inserisci la tua email per ricevere il link di reset password oppure il tuo nome per recuperare l\'email associata al tuo account.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                hintText: 'Inserisci la tua email',
+                labelText: 'Email',
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nomeController,
+              decoration: const InputDecoration(
+                hintText: 'Inserisci il tuo nome e cognome',
+                labelText: 'Nome e Cognome',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -73,33 +91,60 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             onPressed: () async {
               final email = emailController.text.trim();
-              if (email.isEmpty) {
+              final nome = nomeController.text.trim();
+
+              if (email.isEmpty && nome.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Inserisci un indirizzo email')),
+                  const SnackBar(
+                    content: Text(
+                      'Inserisci email o nome per recuperare le credenziali',
+                    ),
+                  ),
                 );
                 return;
               }
+
+              final auth = Provider.of<AuthService>(context, listen: false);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final dialogNavigator = Navigator.of(context);
               try {
-                final auth = Provider.of<AuthService>(context, listen: false);
-                await auth.sendPasswordResetEmail(email);
-                if (mounted) {
-                  Navigator.pop(context); // chiude il dialog
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Email di reset inviata a $email'),
-                      backgroundColor: Colors.green,
-                    ),
+                if (email.isNotEmpty) {
+                  await auth.sendPasswordResetEmail(email);
+                  if (mounted) {
+                    dialogNavigator.pop();
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Email di reset inviata a $email'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                if (nome.isNotEmpty) {
+                  final recoveredEmail = await auth.recoverUserEmailByName(
+                    nome,
                   );
+                  if (mounted) {
+                    dialogNavigator.pop();
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Email recuperata: $recoveredEmail'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     SnackBar(content: Text(e.toString())),
                   );
                 }
               }
             },
-            child: const Text('Invia link'),
+            child: const Text('Recupera'),
           ),
         ],
       ),
@@ -229,16 +274,27 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('ACCEDI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'ACCEDI',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => _showPasswordResetDialog(context),
+                      onPressed: () => _showCredentialsRecoveryDialog(context),
                       child: Text(
-                        'Password dimenticata?',
-                        style: TextStyle(color: guzziRed, fontWeight: FontWeight.w500),
+                        'Recupera credenziali',
+                        style: TextStyle(
+                          color: guzziRed,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -247,7 +303,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (BuildContext context) => const RegisterScreen(),
+                            builder: (BuildContext context) =>
+                                const RegisterScreen(),
                           ),
                         );
                       },
